@@ -1,0 +1,53 @@
+{% extends 'recipes/base.html' %}
+{% block content %}
+<h2>Просмотр данных</h2>
+<div class="mb-3">
+    <a href="?source=files" class="btn btn-outline-primary {% if source == 'files' %}active{% endif %}">Из файлов</a>
+    <a href="?source=db" class="btn btn-outline-success {% if source == 'db' %}active{% endif %}">Из БД</a>
+</div>
+{% if source == 'db' %}
+    <input type="text" id="search-input" class="form-control mb-3" placeholder="Поиск (AJAX)...">
+    <table class="table table-hover bg-white shadow-sm" id="recipes-table">
+        <thead class="table-dark"><tr><th>ID</th><th>Название</th><th>Автор</th><th>Время</th><th>Ингредиенты</th><th>Действия</th></tr></thead>
+        <tbody>
+            {% for r in recipes %}
+            <tr>
+                <td>{{ r.id }}</td><td>{{ r.title }}</td><td>{{ r.author }}</td><td>{{ r.cooking_time }} мин.</td><td>{{ r.ingredients }}</td>
+                <td><a href="{% url 'edit_recipe' r.id %}" class="btn btn-sm btn-warning">Изменить</a><button class="btn btn-sm btn-danger delete-btn" data-id="{{ r.id }}">Удалить</button></td>
+            </tr>
+            {% empty %}<tr><td colspan="6" class="text-center">В базе данных пусто.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    {% if files %}{% for f in files %}
+        <div class="card mb-3 shadow-sm"><div class="card-header bg-info text-white">{{ f.filename }} ({{ f.format }})</div>
+        <div class="card-body">
+            {% if f.error %}<p class="text-danger">{{ f.error }}</p>
+            {% else %}<h5>{{ f.data.title }}</h5><p>{{ f.data.author }} | {{ f.data.cooking_time }} мин.</p><p><b>Ингредиенты:</b> {{ f.data.ingredients|join:", " }}</p>{% endif %}
+        </div></div>
+    {% endfor %}{% else %}<div class="alert alert-warning">Файлов нет.</div>{% endif %}
+{% endif %}
+
+{% if source == 'db' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        fetch(`/api/search/?q=${encodeURIComponent(e.target.value)}`).then(r => r.json()).then(data => {
+            const tb = document.querySelector('#recipes-table tbody'); tb.innerHTML = '';
+            data.recipes.forEach(r => {
+                tb.innerHTML += `<tr><td>${r.id}</td><td>${r.title}</td><td>${r.author}</td><td>${r.cooking_time} мин.</td><td>${r.ingredients}</td>
+                <td><a href="/edit/${r.id}/" class="btn btn-sm btn-warning">Изменить</a><button class="btn btn-sm btn-danger delete-btn" data-id="${r.id}">Удалить</button></td></tr>`;
+            });
+        });
+    });
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-btn')) {
+            if (!confirm('Удалить?')) return;
+            fetch(`/delete/${e.target.dataset.id}/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+            .then(r => r.json()).then(() => e.target.closest('tr').remove());
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
